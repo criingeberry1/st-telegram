@@ -325,13 +325,16 @@
 }
 
 /* --- Voice message --- */
-.tg-voice { display: flex; align-items: center; gap: 8px; min-width: 200px; max-width: 260px; padding: 2px 0; }
+.tg-voice { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 200px; padding: 2px 0; }
 .tg-voice-play { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--tg-accent); }
 .tg-voice-play svg { width: 18px; height: 18px; fill: #ffffff; margin-left: 2px; }
 .tg-voice-body { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.tg-waveform { display: flex; align-items: flex-end; gap: 1.5px; height: 24px; }
-.tg-waveform-bar { width: 3px; border-radius: 1.5px; background: var(--tg-voice-wave); flex-shrink: 0; }
+.tg-waveform { display: flex; align-items: flex-end; gap: 1.5px; height: 24px; width: 100%; }
+.tg-waveform-bar { flex: 1; min-width: 2px; max-width: 4px; border-radius: 1.5px; background: var(--tg-voice-wave); flex-shrink: 0; }
 .tg-voice-dur { font-size: 11px; color: var(--tg-text-secondary); }
+
+/* Voice message bubbles should be wider */
+.tg-voice-msg .tg-bubble { min-width: 65%; }
 
 .tg-voice-transcript {
     margin-top: 3px;
@@ -387,7 +390,7 @@
 
 /* --- System message --- */
 .tg-system { text-align: center; padding: 4px 8px; margin: 4px auto; }
-.tg-system-text { display: inline-block; background: var(--tg-system-bg); color: var(--tg-system-text); font-size: 13px; padding: 3px 10px; border-radius: 14px; line-height: 1.4; max-width: 90%; white-space: normal; word-break: normal; }
+.tg-system-text { display: inline-block; background: var(--tg-system-bg); color: var(--tg-system-text); font-size: 13px; padding: 3px 10px; border-radius: 14px; line-height: 1.4; max-width: 90%; white-space: nowrap !important; word-break: keep-all !important; }
 
 /* --- Input bar (decorative) --- */
 .tg-input-bar { display: flex; align-items: flex-end; gap: 6px; padding: 6px 8px; background: var(--tg-input-bg); border-top: 1px solid var(--tg-border); }
