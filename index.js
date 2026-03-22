@@ -1,19 +1,34 @@
 // ============================================================
-// Telegram UI for SillyTavern
+// Telegram UI for SillyTavern — v2
 // Author: your insomnia & claude code
+//
+// SYNTAX:
+//   {telegram}
+//   = Chat Name | status text
+//   system message text
+//   Sender 'HH:MM' : message text
+//   Sender 'HH:MM' : message text >> 😍2 🔥
+//   Sender 'HH:MM' (reply: Author | quoted text) : response
+//   Sender 'HH:MM' (voice: transcription) :
+//   Sender 'HH:MM' (file: filename.pdf) : caption
+//   Sender 'HH:MM' (photo) : caption
+//   Sender 'HH:MM' (video) : caption
+//   Sender 'HH:MM' (sticker: 😎) :
+//   Sender 'HH:MM' (contact: Contact Name) :
+//   Sender 'HH:MM' ! : failed message
+//   {/telegram}
 // ============================================================
 import { eventSource, event_types } from '../../../../script.js';
 
 const EXT_NAME = 'telegram-ui';
 const PARSED_ATTR = 'data-tg-parsed';
 
-// ── SVG icons (from Telegram source) ──
+// ── SVG icons ──
 const SVG = {
     back: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>',
     call: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.5 16.17v3.34c0 .5-.38.91-.88.95-.41.03-.75.04-1 .04-8.35 0-15.12-6.77-15.12-15.11 0-.26.01-.6.04-1.01C3.58 3.88 4 3.5 4.5 3.5h3.34c.24 0 .44.18.47.42l.06.53c.19 1.33.58 2.6 1.14 3.78.09.18.03.4-.14.53l-2.04 1.46c1.24 2.9 3.56 5.22 6.46 6.46l1.46-2.03c.12-.18.35-.23.54-.14 1.17.55 2.44.94 3.78 1.13l.52.06c.24.03.42.23.42.47Z"/></svg>',
     dots: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></svg>',
     attach: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 13.5V8c0-2.21-1.79-4-4-4S6 5.79 6 8v5.5c0 3.59 2.91 6.5 6.5 6.5s6.5-2.91 6.5-6.5V4h2v9.5c0 4.69-3.81 8.5-8.5 8.5S4 18.19 4 13.5V8c0-3.31 2.69-6 6-6s6 2.69 6 6v5.5c0 1.93-1.57 3.5-3.5 3.5S9 15.43 9 13.5V8h2v5.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5Z"/></svg>',
-    mic: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3c-.8 0-1.56.32-2.12.88C9.32 4.44 9 5.2 9 6v4c0 .8.32 1.56.88 2.12.56.56 1.32.88 2.12.88s1.56-.32 2.12-.88c.56-.56.88-1.32.88-2.12V6c0-.8-.32-1.56-.88-2.12C13.56 3.32 12.8 3 12 3Zm0-2c.66 0 1.31.13 1.91.38.61.25 1.16.62 1.62 1.08.47.47.84 1.02 1.09 1.62.26.6.38 1.25.38 1.92v4c0 1.33-.53 2.6-1.46 3.54-.94.93-2.21 1.46-3.54 1.46-1.33 0-2.6-.53-3.54-1.46C7.53 12.6 7 11.33 7 10V6c0-1.33.53-2.6 1.46-3.54C9.4 1.53 10.67 1 12 1ZM3.055 11h2.014c.24 1.66 1.08 3.19 2.35 4.29C8.69 16.39 10.32 17 12 17s3.31-.61 4.58-1.71c1.27-1.1 2.1-2.63 2.35-4.29h2.015c-.23 2.03-1.14 3.92-2.58 5.36-1.44 1.45-3.33 2.35-5.36 2.58V23h-2v-4.06c-2.03-.23-3.92-1.13-5.36-2.58C4.19 14.92 3.28 13.03 3.055 11Z"/></svg>',
     send: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 13h6v-2H3V1.846a.48.48 0 01.74-.408L22.204 11.562a.48.48 0 010 .876L3.74 22.592A.48.48 0 013 22.154V13Z"/></svg>',
     play: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M8 5.14v13.72a.5.5 0 00.76.43l10.5-6.86a.5.5 0 000-.86L8.76 4.71a.5.5 0 00-.76.43Z"/></svg>',
     photo: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 11.1L7 9.1l5.5 5.5L16 11.1l3 3V5H5v6.1ZM4 3h16a1 1 0 011 1v16a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1Zm11.5 7a1.5 1.5 0 100-3 1.5 1.5 0 000 3Z"/></svg>',
@@ -21,13 +36,11 @@ const SVG = {
     file: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22 8v12a1 1 0 01-1 1H3a1 1 0 01-1-1V7h19a1 1 0 011 1ZM12.414 5H2V4a1 1 0 011-1h7.414l2 2Z"/></svg>',
     sticker: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10.52 19.86c.08-1.2.36-2.35.83-3.4-1.54-.14-2.93-.78-4.02-1.75l1.33-1.49A5.5 5.5 0 0012 14.5c.18 0 .35-.01.52-.03 1.71-2.25 4.35-3.76 7.34-3.95C19.17 6.81 15.91 4 12 4a8 8 0 00-1.48 15.86Zm8.5-7.23c-3.23.22-5.78 2.77-6 6l6-6ZM22 12v.5l-9.5 9.99c-.17 0-.33 0-.5 0a10 10 0 110-20 10 10 0 0110 10ZM10 10a1.5 1.5 0 10-3 0 1.5 1.5 0 003 0Zm7 0a1.5 1.5 0 10-3 0 1.5 1.5 0 003 0Z"/></svg>',
     error: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 21c-4.97 0-9-4.03-9-9s4.03-9 9-9 9 4.03 9 9-4.03 9-9 9Zm-.9-6.3v1.8h1.8v-1.8h-1.8Zm0-7.2v5.4h1.8V7.5h-1.8Z"/></svg>',
-    check1: '<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M12.354 4.646a.5.5 0 010 .708l-6 6a.5.5 0 01-.708 0l-3-3a.5.5 0 11.708-.708L6 10.293l5.646-5.647a.5.5 0 01.708 0Z" fill="currentColor"/></svg>',
     check2: '<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M12.354 4.646a.5.5 0 010 .708l-6 6a.5.5 0 01-.708 0l-3-3a.5.5 0 11.708-.708L6 10.293l5.646-5.647a.5.5 0 01.708 0Z" fill="currentColor"/><path d="M9.354 4.646a.5.5 0 010 .708l-6 6a.5.5 0 01-.708 0l-1-1a.5.5 0 11.708-.708L3 10.293l5.646-5.647a.5.5 0 01.708 0Z" fill="currentColor" opacity="0.65"/></svg>',
 };
 
-// ── Telegram sender name color palette ──
+// ── Color palette ──
 const NAME_COLORS = ['#fc5c51', '#fa790f', '#895dd5', '#0fb297', '#27a5e7', '#3391d4', '#7f69cc'];
-const AVATAR_COLORS = NAME_COLORS;
 
 function hashStr(str) {
     let h = 0;
@@ -38,9 +51,7 @@ function hashStr(str) {
     return Math.abs(h);
 }
 
-function getColorIndex(name) {
-    return hashStr(name) % NAME_COLORS.length;
-}
+function getColorIndex(name) { return hashStr(name) % NAME_COLORS.length; }
 
 function getInitials(name) {
     const clean = name.replace(/[_\-]/g, ' ');
@@ -51,9 +62,7 @@ function getInitials(name) {
 
 function getRandomSize(seed) {
     const h = hashStr(seed || 'file');
-    return h % 2 === 0
-        ? ((h % 50) / 10 + 0.1).toFixed(1) + ' MB'
-        : ((h % 800) + 50) + ' KB';
+    return h % 2 === 0 ? ((h % 50) / 10 + 0.1).toFixed(1) + ' MB' : ((h % 800) + 50) + ' KB';
 }
 
 function generateWaveform(seed, count) {
@@ -85,29 +94,19 @@ function isDarkTheme() {
     return true;
 }
 
-// ── Reaction parser: "[😂3 ❤1 👍]" → [{emoji, count}] ──
+// ── Reaction parser: "😂3 ❤1 👍" → [{emoji, count}] ──
 function parseReactions(raw) {
     if (!raw) return [];
     const results = [];
-    // Split by spaces or commas, then extract emoji+count
     const tokens = raw.trim().split(/[\s,]+/);
     for (const tok of tokens) {
-        // Separate leading emoji cluster from trailing digits
+        if (!tok) continue;
         const m = tok.match(/^(.+?)(\d+)?$/);
-        if (m) {
+        if (m && m[1]) {
             results.push({ emoji: m[1], count: parseInt(m[2]) || 1 });
         }
     }
     return results;
-}
-
-// ── Tail SVG generators ──
-function tailIn(color) {
-    return `<svg class="tg-tail" viewBox="0 0 10 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 0v20H3c0-4 1-6 3-9C8.5 7 9.5 3.5 10 0Z" fill="${color}"/></svg>`;
-}
-
-function tailOut(color) {
-    return `<svg class="tg-tail" viewBox="0 0 10 20" xmlns="http://www.w3.org/2000/svg"><path d="M0 0v20h7c0-4-1-6-3-9C1.5 7 .5 3.5 0 0Z" fill="${color}"/></svg>`;
 }
 
 // ── Main parser ──
@@ -116,7 +115,12 @@ function parseTelegramTags(htmlText) {
     const blockRegex = /\{\s*telegram\s*\}([\s\S]*?)\{\s*\/telegram\s*\}/gi;
 
     return text.replace(blockRegex, (_, content) => {
-        let clean = content.replace(/<\/?p>/gi, '').trim();
+        // Pre-process: restore ST markdown conversions before stripping tags
+        let clean = content
+            .replace(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi, '= $1') // restore headings → = prefix
+            .replace(/<\/?p>/gi, '')
+            .trim();
+
         const lines = clean.split(/(?:<br\s*\/?>|\n)/i).filter(l => l.trim());
         const dark = isDarkTheme();
         const themeClass = dark ? 'tg-dark' : 'tg-light';
@@ -128,29 +132,46 @@ function parseTelegramTags(htmlText) {
             let pure = line.replace(/<[^>]*>/g, '').trim();
             if (!pure) return;
 
-            // Header line: # ChatName | status
-            const hm = pure.match(/^#\s*(.+?)(?:\s*\|\s*(.+))?$/);
+            // ── Header: "= ChatName | status" ──
+            const hm = pure.match(/^=\s*(.+?)(?:\s*\|\s*(.+))?$/);
             if (hm) {
                 header = { name: hm[1].trim(), status: (hm[2] || '').trim() };
                 return;
             }
 
-            // Message line:
-            // Sender '12:30' (type: data) [reactions] ! : text
+            // ── Message line ──
+            // Name captured as anything before the first 'HH:MM' (robust for any unicode)
+            // Format: Sender 'HH:MM' (type: data) ! : text >> reactions
             const mm = pure.match(
-                /^([A-Za-zА-Яа-яЁё0-9_\- ]+?)\s*'(\d{2}:\d{2})'\s*(?:\((reply|file|voice|photo|video|sticker|media|contact|location)(?::\s*(.*?))?\))?\s*(?:\[([^\]]+)\])?\s*(!)?\s*:\s*([\s\S]*)$/i
+                /^([^']+?)\s+'(\d{2}:\d{2})'\s*(?:\((reply|file|voice|photo|video|sticker|media|contact|location)(?::\s*(.*?))?\))?\s*(!)?\s*:\s*([\s\S]*)$/i
             );
             if (mm) {
+                let msgText = mm[6].trim();
+                let reactions = [];
+
+                // ── Extract reactions from end of text: "text >> 😍2 🔥" ──
+                const reactSplit = msgText.lastIndexOf('>>');
+                if (reactSplit !== -1) {
+                    const reactStr = msgText.substring(reactSplit + 2).trim();
+                    if (reactStr) {
+                        reactions = parseReactions(reactStr);
+                        if (reactions.length > 0) {
+                            msgText = msgText.substring(0, reactSplit).trim();
+                        }
+                    }
+                }
+
                 messages.push({
                     sender: mm[1].trim(),
                     time: mm[2],
                     type: mm[3] ? mm[3].toLowerCase() : null,
                     data: mm[4] || null,
-                    reactions: parseReactions(mm[5]),
-                    err: !!mm[6],
-                    text: mm[7].trim(),
+                    reactions: reactions,
+                    err: !!mm[5],
+                    text: msgText,
                 });
             } else {
+                // System message (date separators, join notifications, etc.)
                 messages.push({ system: pure });
             }
         });
@@ -166,7 +187,9 @@ function parseTelegramTags(htmlText) {
 
         const hIdx = getColorIndex(header.name);
 
-        // ── Build HTML ──
+        // ════════════════════════════════════
+        // BUILD HTML (no inline styles, no SVG tails)
+        // ════════════════════════════════════
         let html = `<div class="tg-container ${themeClass}">`;
 
         // Header
@@ -201,31 +224,27 @@ function parseTelegramTags(htmlText) {
             const cIdx = getColorIndex(msg.sender);
             const isSticker = msg.type === 'sticker';
 
-            // Sticker (no bubble)
+            // ── Sticker (no bubble) ──
             if (isSticker) {
                 html += `<div class="tg-msg-row ${dir} tg-sticker-row ${hasTail ? 'tg-has-tail' : ''}">`;
-                html += `<div>`;
                 html += `<div class="tg-sticker">${msg.data || msg.text || '😀'}</div>`;
                 html += `<div class="tg-meta"><span class="tg-time">${msg.time}</span>`;
                 if (isMe && !msg.err) html += `<span class="tg-checks tg-read">${SVG.check2}</span>`;
                 html += `</div>`;
                 if (msg.reactions.length) html += buildReactions(msg.reactions);
-                html += `</div></div>`;
+                html += `</div>`;
                 return;
             }
 
-            // Regular message
-            html += `<div class="tg-msg-row ${dir} ${hasTail ? 'tg-has-tail' : ''} ${msg.err ? 'tg-msg-error' : ''} ${!msg.type && !msg.text ? 'tg-empty-msg' : ''} ${!msg.type ? 'tg-text-only' : ''}">`;
+            // ── Regular message ──
+            const rowClasses = [
+                'tg-msg-row', dir,
+                hasTail ? 'tg-has-tail' : '',
+                msg.err ? 'tg-msg-error' : '',
+                !msg.type ? 'tg-text-only' : '',
+            ].filter(Boolean).join(' ');
 
-            // Bubble wrapper
-            html += `<div style="display:flex;align-items:flex-end;gap:0;position:relative;">`;
-
-            // Tail
-            if (hasTail && !isMe) {
-                const tailColor = dark ? 'var(--tg-bubble-in)' : 'var(--tg-bubble-in)';
-                html += tailIn(tailColor);
-            }
-
+            html += `<div class="${rowClasses}">`;
             html += `<div class="tg-bubble">`;
 
             // Sender name
@@ -233,19 +252,29 @@ function parseTelegramTags(htmlText) {
                 html += `<div class="tg-sender tg-name-${cIdx + 1}">${msg.sender}</div>`;
             }
 
-            // Reply
-            if (msg.type === 'reply') {
-                const replyName = msg.data ? msg.data.split(':')[0] || msg.sender : msg.sender;
-                const replyText = msg.data || '';
+            // ── Reply ──
+            if (msg.type === 'reply' && msg.data) {
+                // Format: "Author | quoted text"
+                const pipeIdx = msg.data.indexOf('|');
+                let replyAuthor, replyText;
+                if (pipeIdx !== -1) {
+                    replyAuthor = msg.data.substring(0, pipeIdx).trim();
+                    replyText = msg.data.substring(pipeIdx + 1).trim();
+                } else {
+                    // Fallback: entire data is the quoted text, author unknown
+                    replyAuthor = '...';
+                    replyText = msg.data;
+                }
+                const replyColorIdx = getColorIndex(replyAuthor);
                 html += `<div class="tg-reply">`;
-                html += `<div class="tg-reply-bar" style="background:${NAME_COLORS[cIdx]}"></div>`;
+                html += `<div class="tg-reply-bar" style="background:${NAME_COLORS[replyColorIdx]}"></div>`;
                 html += `<div class="tg-reply-content">`;
-                html += `<div class="tg-reply-name tg-name-${cIdx + 1}">${replyName}</div>`;
+                html += `<div class="tg-reply-name tg-name-${replyColorIdx + 1}">${replyAuthor}</div>`;
                 html += `<div class="tg-reply-text">${replyText}</div>`;
                 html += `</div></div>`;
             }
 
-            // Voice
+            // ── Voice ──
             if (msg.type === 'voice') {
                 const waveform = generateWaveform(msg.data || msg.sender + msg.time);
                 const dur = generateVoiceDuration(msg.data || msg.sender);
@@ -264,18 +293,17 @@ function parseTelegramTags(htmlText) {
                 }
             }
 
-            // Photo/Media
+            // ── Photo / Media ──
             if (msg.type === 'photo' || msg.type === 'media') {
-                const icon = msg.type === 'photo' ? SVG.photo : SVG.video;
-                html += `<div class="tg-media-placeholder">${icon}</div>`;
+                html += `<div class="tg-media-placeholder">${msg.type === 'photo' ? SVG.photo : SVG.video}</div>`;
             }
 
-            // Video
+            // ── Video ──
             if (msg.type === 'video') {
                 html += `<div class="tg-media-placeholder">${SVG.video}</div>`;
             }
 
-            // File
+            // ── File ──
             if (msg.type === 'file') {
                 const fname = msg.data || 'document.pdf';
                 html += `<div class="tg-file">`;
@@ -286,7 +314,7 @@ function parseTelegramTags(htmlText) {
                 html += `</div></div>`;
             }
 
-            // Contact
+            // ── Contact ──
             if (msg.type === 'contact') {
                 const cname = msg.data || 'Contact';
                 const ccIdx = getColorIndex(cname);
@@ -296,12 +324,12 @@ function parseTelegramTags(htmlText) {
                 html += `</div>`;
             }
 
-            // Text
+            // ── Text ──
             if (msg.text) {
                 html += `<div class="tg-text">${msg.text}</div>`;
             }
 
-            // Meta (time + checks)
+            // ── Meta (time + checks) ──
             html += `<div class="tg-meta">`;
             html += `<span class="tg-time">${msg.time}</span>`;
             if (isMe && !msg.err) {
@@ -311,15 +339,7 @@ function parseTelegramTags(htmlText) {
 
             html += `</div>`; // .tg-bubble
 
-            // Tail (outgoing)
-            if (hasTail && isMe) {
-                const tailColor = dark ? 'var(--tg-bubble-out)' : 'var(--tg-bubble-out)';
-                html += tailOut(tailColor);
-            }
-
-            html += `</div>`; // wrapper
-
-            // Error badge
+            // ── Error badge (below bubble, won't break alignment) ──
             if (msg.err) {
                 html += `<div class="tg-error-badge">`;
                 html += `<div class="tg-error-icon">${SVG.error}</div>`;
@@ -327,7 +347,7 @@ function parseTelegramTags(htmlText) {
                 html += `</div>`;
             }
 
-            // Reactions
+            // ── Reactions ──
             if (msg.reactions.length) {
                 html += buildReactions(msg.reactions);
             }
@@ -361,7 +381,7 @@ function buildReactions(reactions) {
     return html;
 }
 
-// ── Render logic (with dedup) ──
+// ── Render logic ──
 let renderScheduled = false;
 
 function render() {
@@ -385,7 +405,6 @@ function scheduleRender() {
     requestAnimationFrame(() => setTimeout(render, 100));
 }
 
-// Reset parsed flags on chat change so messages re-render
 function resetParsed() {
     $(`.mes_text[${PARSED_ATTR}]`).removeAttr(PARSED_ATTR);
     scheduleRender();
@@ -398,7 +417,6 @@ jQuery(async () => {
     eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, scheduleRender);
     eventSource.on(event_types.USER_MESSAGE_RENDERED, scheduleRender);
     eventSource.on(event_types.MESSAGE_UPDATED, () => {
-        // On update, allow re-parse of all messages
         $(`.mes_text[${PARSED_ATTR}]`).removeAttr(PARSED_ATTR);
         scheduleRender();
     });
