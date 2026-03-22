@@ -384,7 +384,9 @@ function buildReactions(reactions) {
     reactions.forEach(r => {
         html += `<div class="tg-reaction">`;
         html += `<span class="tg-reaction-emoji">${r.emoji}</span>`;
-        html += `<span class="tg-reaction-count">${r.count > 1 ? r.count : ''}</span>`;
+        if (r.count > 1) {
+            html += `<span class="tg-reaction-count">${r.count}</span>`;
+        }
         html += `</div>`;
     });
     html += '</div>';
