@@ -334,18 +334,21 @@ function parseTelegramTags(htmlText) {
                 html += `</div>`;
             }
 
-            // ── Text ──
-            if (msg.text) {
-                html += `<div class="tg-text">${msg.text}</div>`;
-            }
-
-            // ── Meta (time + checks) ──
-            html += `<div class="tg-meta">`;
-            html += `<span class="tg-time">${msg.time}</span>`;
+            // ── Build meta HTML ──
+            let metaHtml = `<span class="tg-meta">`;
+            metaHtml += `<span class="tg-time">${msg.time}</span>`;
             if (isMe && !msg.err) {
-                html += `<span class="tg-checks tg-read">${SVG.check2}</span>`;
+                metaHtml += `<span class="tg-checks tg-read">${SVG.check2}</span>`;
             }
-            html += `</div>`;
+            metaHtml += `</span>`;
+
+            // ── Text + meta (meta goes INSIDE text for proper float interaction) ──
+            if (msg.text) {
+                html += `<div class="tg-text">${msg.text}<span class="tg-spacer"></span>${metaHtml}</div>`;
+            } else {
+                // No text — meta floats inside the bubble after attachment
+                html += `<div class="tg-meta-standalone">${metaHtml}</div>`;
+            }
 
             html += `</div>`; // .tg-bubble
 
