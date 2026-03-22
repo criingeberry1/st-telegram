@@ -1,0 +1,13 @@
+{
+    "display_name": "Telegram UI for Roleplay",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "your insomnia & claude code",
+    "version": "1.0.0",
+    "description": "Парсит теги {telegram}...{/telegram} и превращает их в точную копию интерфейса Telegram с автоопределением темы, голосовыми, реплаями и реакциями.",
+    "homePage": "",
+    "auto_update": false
+}
