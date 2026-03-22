@@ -66,7 +66,7 @@ function getRandomSize(seed) {
 }
 
 function generateWaveform(seed, count) {
-    count = count || 28;
+    count = count || 42;
     let h = hashStr(seed || 'voice');
     const bars = [];
     for (let i = 0; i < count; i++) {
@@ -118,6 +118,7 @@ function parseTelegramTags(htmlText) {
         // Pre-process: restore ST markdown conversions before stripping tags
         let clean = content
             .replace(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi, '= $1') // restore headings → = prefix
+            .replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, '>> $1') // restore blockquotes → >> prefix
             .replace(/<\/?p>/gi, '')
             .trim();
 
@@ -129,7 +130,15 @@ function parseTelegramTags(htmlText) {
         let messages = [];
 
         lines.forEach(line => {
-            let pure = line.replace(/<[^>]*>/g, '').trim();
+            let pure = line
+                .replace(/<[^>]*>/g, '')
+                .replace(/&gt;/g, '>')
+                .replace(/&lt;/g, '<')
+                .replace(/&amp;/g, '&')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/&nbsp;/g, ' ')
+                .trim();
             if (!pure) return;
 
             // ── Header: "= ChatName | status" ──
@@ -242,6 +251,7 @@ function parseTelegramTags(htmlText) {
                 hasTail ? 'tg-has-tail' : '',
                 msg.err ? 'tg-msg-error' : '',
                 !msg.type ? 'tg-text-only' : '',
+                msg.type === 'voice' ? 'tg-voice-msg' : '',
             ].filter(Boolean).join(' ');
 
             html += `<div class="${rowClasses}">`;
