@@ -199,6 +199,11 @@
     word-break: normal;
 }
 
+/* Extra bottom padding when reactions are present */
+.tg-bubble .tg-reactions:last-child {
+    margin-bottom: 4px;
+}
+
 .tg-in .tg-bubble { background: var(--tg-bubble-in); border-radius: 12px; }
 .tg-in.tg-has-tail .tg-bubble { border-radius: 12px 12px 12px 0; }
 .tg-out .tg-bubble { background: var(--tg-bubble-out); border-radius: 12px; }
@@ -398,12 +403,36 @@
 .tg-contact-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #fff; font-size: 16px; flex-shrink: 0; text-transform: uppercase; }
 .tg-contact-name { font-size: 14px; font-weight: 500; color: var(--tg-accent); }
 
-/* --- Reactions --- */
-.tg-reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; padding: 0 2px; }
-.tg-reaction { display: inline-flex; align-items: center; gap: 0; background: var(--tg-reaction-bg); border-radius: 12px; padding: 2px 7px; font-size: 14px; line-height: 1.4; border: 1px solid transparent; cursor: default; width: fit-content; }
-.tg-reaction-emoji { font-size: 16px; }
-.tg-reaction-count { font-size: 12px; font-weight: 500; color: var(--tg-text-secondary); margin-left: 4px; }
-.tg-reaction.tg-reaction-mine { background: var(--tg-reaction-active-bg); border-color: var(--tg-reaction-active-border); }
+/* --- Reactions (Telegram mobile — compact pills inside bubble) --- */
+.tg-reactions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+    margin-bottom: 2px;
+    clear: both;
+}
+
+.tg-reaction {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    background: rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 2px 6px;
+    font-size: 13px;
+    line-height: 1.3;
+    cursor: default;
+    height: 24px;
+}
+
+.tg-light .tg-reaction {
+    background: rgba(0,0,0,0.06);
+}
+
+.tg-reaction-emoji { font-size: 15px; line-height: 1; }
+.tg-reaction-count { font-size: 11px; font-weight: 600; color: var(--tg-text-secondary); margin-left: 2px; }
+.tg-reaction.tg-reaction-mine { background: var(--tg-reaction-active-bg); }
 .tg-reaction.tg-reaction-mine .tg-reaction-count { color: var(--tg-accent); }
 
 /* --- System message --- */
