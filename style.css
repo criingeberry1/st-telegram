@@ -403,37 +403,47 @@
 .tg-contact-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #fff; font-size: 16px; flex-shrink: 0; text-transform: uppercase; }
 .tg-contact-name { font-size: 14px; font-weight: 500; color: var(--tg-accent); }
 
-/* --- Reactions (Telegram mobile — compact pills inside bubble) --- */
+/* --- Reactions (Telegram mobile — pills inside bubble) --- */
 .tg-reactions {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-    margin-top: 4px;
+    margin-top: 6px;
     margin-bottom: 2px;
+    padding-top: 2px;
     clear: both;
 }
 
 .tg-reaction {
     display: inline-flex;
     align-items: center;
-    gap: 0;
-    background: rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 2px 6px;
-    font-size: 13px;
-    line-height: 1.3;
+    background: rgba(0,0,0,0.15);
+    border-radius: 100px;
+    padding: 3px 6px;
     cursor: default;
-    height: 24px;
+    gap: 2px;
 }
 
 .tg-light .tg-reaction {
-    background: rgba(0,0,0,0.06);
+    background: rgba(0,0,0,0.07);
 }
 
-.tg-reaction-emoji { font-size: 15px; line-height: 1; }
-.tg-reaction-count { font-size: 11px; font-weight: 600; color: var(--tg-text-secondary); margin-left: 2px; }
-.tg-reaction.tg-reaction-mine { background: var(--tg-reaction-active-bg); }
-.tg-reaction.tg-reaction-mine .tg-reaction-count { color: var(--tg-accent); }
+.tg-reaction-emoji {
+    font-size: 17px;
+    line-height: 1;
+}
+
+.tg-reaction-count {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffffff;
+    margin-left: 1px;
+    line-height: 1;
+}
+
+.tg-light .tg-reaction-count {
+    color: #333333;
+}
 
 /* --- System message --- */
 .tg-system { text-align: center; padding: 4px 8px; margin: 4px auto; }
