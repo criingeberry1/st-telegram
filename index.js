@@ -18,7 +18,7 @@
 //   Sender (s: 😎):                  ← sticker
 //   Sender (c: Name):                ← contact
 //   Sender !: failed message         ← send error
-//   >> 😍2 🔥                        ← reactions (attaches to previous message)
+//   ~ 😍2 🔥                        ← reactions (attaches to previous message)
 //   system message text              ← anything without colon = system
 //
 //   ALSO SUPPORTS full old syntax:
@@ -199,8 +199,8 @@ function parseTelegramTags(htmlText) {
                 return;
             }
 
-            // ── 3. Reactions line: ">> emoji" ──
-            const rm = pure.match(/^>>\s*(.+)$/);
+            // ── 3. Reactions line: "~ emoji" or ">> emoji" ──
+            const rm = pure.match(/^(?:~|>>)\s*(.+)$/);
             if (rm && messages.length > 0) {
                 const reactions = parseReactions(rm[1]);
                 if (reactions.length) {
@@ -231,11 +231,14 @@ function parseTelegramTags(htmlText) {
             let prefix = rest.slice(0, colonIdx).trim();
             let msgText = rest.slice(colonIdx + 1).trim();
 
-            // ── Extract inline reactions from text: "text >> emoji" (backward compat) ──
+            // ── Extract inline reactions from text: "text >> emoji" or "text ~ emoji" ──
             let reactions = [];
-            const rrIdx = msgText.lastIndexOf('>>');
+            // Try ~ first (preferred, ST-safe), then >> (backward compat)
+            let rrIdx = msgText.lastIndexOf(' ~ ');
+            if (rrIdx === -1) rrIdx = msgText.lastIndexOf('>>');
             if (rrIdx !== -1) {
-                const rStr = msgText.substring(rrIdx + 2).trim();
+                const sepLen = msgText[rrIdx] === '>' ? 2 : 3; // '>>' = 2, ' ~ ' matched at space so +3
+                const rStr = msgText.substring(rrIdx + sepLen).trim();
                 if (rStr) {
                     const parsed = parseReactions(rStr);
                     if (parsed.length) { reactions = parsed; msgText = msgText.substring(0, rrIdx).trim(); }
@@ -462,6 +465,9 @@ function parseTelegramTags(htmlText) {
                 html += `<div class="tg-meta-standalone">${metaHtml}</div>`;
             }
 
+            // Reactions (inside bubble, at the bottom)
+            if (msg.reactions.length) html += buildReactions(msg.reactions);
+
             html += `</div>`; // .tg-bubble
 
             // Error badge
@@ -470,9 +476,6 @@ function parseTelegramTags(htmlText) {
                 html += `<div class="tg-error-icon">${SVG.error}</div>`;
                 html += `<span class="tg-error-label">Sending failed</span></div>`;
             }
-
-            // Reactions
-            if (msg.reactions.length) html += buildReactions(msg.reactions);
 
             html += `</div>`; // .tg-msg-row
         });
