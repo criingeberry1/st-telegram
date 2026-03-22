@@ -193,6 +193,7 @@
 .tg-bubble {
     position: relative;
     max-width: 85%;
+    width: fit-content;
     padding: 6px 10px 4px 10px;
     word-wrap: break-word;
     overflow-wrap: break-word;
@@ -382,15 +383,15 @@
 
 /* --- Reactions --- */
 .tg-reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; padding: 0 2px; }
-.tg-reaction { display: inline-flex; align-items: center; gap: 4px; background: var(--tg-reaction-bg); border-radius: 12px; padding: 2px 8px 2px 6px; font-size: 14px; line-height: 1.4; border: 1px solid transparent; cursor: default; }
+.tg-reaction { display: inline-flex; align-items: center; gap: 0; background: var(--tg-reaction-bg); border-radius: 12px; padding: 2px 7px; font-size: 14px; line-height: 1.4; border: 1px solid transparent; cursor: default; width: fit-content; }
 .tg-reaction-emoji { font-size: 16px; }
-.tg-reaction-count { font-size: 12px; font-weight: 500; color: var(--tg-text-secondary); min-width: 8px; text-align: center; }
+.tg-reaction-count { font-size: 12px; font-weight: 500; color: var(--tg-text-secondary); margin-left: 4px; }
 .tg-reaction.tg-reaction-mine { background: var(--tg-reaction-active-bg); border-color: var(--tg-reaction-active-border); }
 .tg-reaction.tg-reaction-mine .tg-reaction-count { color: var(--tg-accent); }
 
 /* --- System message --- */
-.tg-system { text-align: center; padding: 4px 8px; margin: 4px auto; }
-.tg-system-text { display: inline-block; background: var(--tg-system-bg); color: var(--tg-system-text); font-size: 13px; padding: 3px 10px; border-radius: 14px; line-height: 1.4; max-width: 90%; white-space: nowrap !important; word-break: keep-all !important; }
+.tg-system { text-align: center; padding: 4px 8px; margin: 4px auto; display: flex; justify-content: center; }
+.tg-system-text { display: inline-block; background: var(--tg-system-bg); color: var(--tg-system-text); font-size: 13px; padding: 4px 12px; border-radius: 14px; line-height: 1.4; width: fit-content; max-width: 90%; white-space: nowrap !important; word-break: keep-all !important; }
 
 /* --- Input bar (decorative) --- */
 .tg-input-bar { display: flex; align-items: flex-end; gap: 6px; padding: 6px 8px; background: var(--tg-input-bg); border-top: 1px solid var(--tg-border); }
