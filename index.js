@@ -1,21 +1,29 @@
 // ============================================================
-// Telegram UI for SillyTavern — v2
+// Telegram UI for SillyTavern — v3 (compact syntax)
 // Author: your insomnia & claude code
 //
-// SYNTAX:
+// COMPACT SYNTAX (token-optimized for AI generation):
 //   {telegram}
-//   = Chat Name | status text
-//   system message text
-//   Sender 'HH:MM' : message text
-//   Sender 'HH:MM' : message text >> 😍2 🔥
-//   Sender 'HH:MM' (reply: Author | quoted text) : response
-//   Sender 'HH:MM' (voice: transcription) :
-//   Sender 'HH:MM' (file: filename.pdf) : caption
-//   Sender 'HH:MM' (photo) : caption
-//   Sender 'HH:MM' (video) : caption
-//   Sender 'HH:MM' (sticker: 😎) :
-//   Sender 'HH:MM' (contact: Contact Name) :
-//   Sender 'HH:MM' ! : failed message
+//   = Chat Name | status
+//
+//   'HH:MM'                          ← set base time (auto-increments on sender change)
+//   Sender: message text             ← new sender
+//   : another message                ← same sender continues
+//   {4}: important msg               ← numbered (for reply references)
+//   Sender (r#4): response           ← reply to message #4
+//   Sender (v: transcription):       ← voice message
+//   Sender (f: file.pdf): caption    ← file
+//   Sender (p): caption              ← photo
+//   Sender (vid): caption            ← video
+//   Sender (s: 😎):                  ← sticker
+//   Sender (c: Name):                ← contact
+//   Sender !: failed message         ← send error
+//   >> 😍2 🔥                        ← reactions (attaches to previous message)
+//   system message text              ← anything without colon = system
+//
+//   ALSO SUPPORTS full old syntax:
+//   Sender 'HH:MM' (reply: Author | text) : message >> reactions
+//
 //   {/telegram}
 // ============================================================
 import { eventSource, event_types } from '../../../../script.js';
@@ -39,15 +47,12 @@ const SVG = {
     check2: '<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M12.354 4.646a.5.5 0 010 .708l-6 6a.5.5 0 01-.708 0l-3-3a.5.5 0 11.708-.708L6 10.293l5.646-5.647a.5.5 0 01.708 0Z" fill="currentColor"/><path d="M9.354 4.646a.5.5 0 010 .708l-6 6a.5.5 0 01-.708 0l-1-1a.5.5 0 11.708-.708L3 10.293l5.646-5.647a.5.5 0 01.708 0Z" fill="currentColor" opacity="0.65"/></svg>',
 };
 
-// ── Color palette ──
+// ── Helpers ──
 const NAME_COLORS = ['#fc5c51', '#fa790f', '#895dd5', '#0fb297', '#27a5e7', '#3391d4', '#7f69cc'];
 
 function hashStr(str) {
     let h = 0;
-    for (let i = 0; i < str.length; i++) {
-        h = ((h << 5) - h) + str.charCodeAt(i);
-        h |= 0;
-    }
+    for (let i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; }
     return Math.abs(h);
 }
 
@@ -69,10 +74,7 @@ function generateWaveform(seed, count) {
     count = count || 42;
     let h = hashStr(seed || 'voice');
     const bars = [];
-    for (let i = 0; i < count; i++) {
-        h = ((h << 5) - h + i) | 0;
-        bars.push(Math.abs(h % 18) + 3);
-    }
+    for (let i = 0; i < count; i++) { h = ((h << 5) - h + i) | 0; bars.push(Math.abs(h % 18) + 3); }
     return bars;
 }
 
@@ -82,43 +84,87 @@ function generateVoiceDuration(seed) {
     return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
 }
 
-// ── Theme detection ──
 function isDarkTheme() {
     const el = document.querySelector('#chat') || document.body;
     const bg = getComputedStyle(el).backgroundColor;
     const m = bg.match(/\d+/g);
-    if (m) {
-        const [r, g, b] = m.map(Number);
-        return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5;
-    }
+    if (m) { const [r, g, b] = m.map(Number); return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5; }
     return true;
 }
 
-// ── Reaction parser: "😂3 ❤1 👍" → [{emoji, count}] ──
 function parseReactions(raw) {
     if (!raw) return [];
     const results = [];
-    const tokens = raw.trim().split(/[\s,]+/);
-    for (const tok of tokens) {
+    for (const tok of raw.trim().split(/[\s,]+/)) {
         if (!tok) continue;
         const m = tok.match(/^(.+?)(\d+)?$/);
-        if (m && m[1]) {
-            results.push({ emoji: m[1], count: parseInt(m[2]) || 1 });
-        }
+        if (m && m[1]) results.push({ emoji: m[1], count: parseInt(m[2]) || 1 });
     }
     return results;
 }
 
-// ── Main parser ──
+function decodeEntities(str) {
+    return str
+        .replace(/&gt;/g, '>').replace(/&lt;/g, '<')
+        .replace(/&amp;/g, '&').replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
+}
+
+// ── Time auto-increment ──
+function addMinutes(timeStr, mins) {
+    const [h, m] = timeStr.split(':').map(Number);
+    const total = h * 60 + m + mins;
+    return String(Math.floor(total / 60) % 24).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
+}
+
+// ── Type parser (short + full names) ──
+function parseTypeStr(raw) {
+    if (!raw) return { type: null, data: null };
+    raw = raw.trim();
+    let m;
+    // r#N → reply to message N
+    if ((m = raw.match(/^r#(\d+)$/i))) return { type: 'reply', data: m[1] };
+    // v / v: transcription → voice
+    if ((m = raw.match(/^v(?::\s*(.*))?$/i))) return { type: 'voice', data: m[1] || null };
+    // f: filename → file
+    if ((m = raw.match(/^f:\s*(.+)$/i))) return { type: 'file', data: m[1] };
+    // p → photo
+    if (/^p$/i.test(raw)) return { type: 'photo', data: null };
+    // vid → video
+    if (/^vid$/i.test(raw)) return { type: 'video', data: null };
+    // s: emoji → sticker
+    if ((m = raw.match(/^s:\s*(.+)$/i))) return { type: 'sticker', data: m[1] };
+    // c: name → contact
+    if ((m = raw.match(/^c:\s*(.+)$/i))) return { type: 'contact', data: m[1] };
+    // Full old names: reply, file, voice, photo, video, sticker, media, contact
+    if ((m = raw.match(/^(reply|file|voice|photo|video|sticker|media|contact)(?::\s*(.*))?$/i))) {
+        return { type: m[1].toLowerCase(), data: m[2] || null };
+    }
+    return { type: null, data: null };
+}
+
+// ── Find first colon NOT inside parentheses ──
+function findSepColon(str) {
+    let depth = 0;
+    for (let i = 0; i < str.length; i++) {
+        if (str[i] === '(') depth++;
+        else if (str[i] === ')') depth--;
+        else if (str[i] === ':' && depth === 0) return i;
+    }
+    return -1;
+}
+
+// ══════════════════════════════════════
+// MAIN PARSER
+// ══════════════════════════════════════
 function parseTelegramTags(htmlText) {
     let text = htmlText.replace(/ㅤ/g, ' ');
     const blockRegex = /\{\s*telegram\s*\}([\s\S]*?)\{\s*\/telegram\s*\}/gi;
 
     return text.replace(blockRegex, (_, content) => {
-        // Pre-process: restore ST markdown conversions before stripping tags
         let clean = content
-            .replace(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi, '= $1') // restore headings → = prefix
-            .replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, '>> $1') // restore blockquotes → >> prefix
+            .replace(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi, '= $1')
+            .replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, '>> $1')
             .replace(/<\/?p>/gi, '')
             .trim();
 
@@ -127,78 +173,155 @@ function parseTelegramTags(htmlText) {
         const themeClass = dark ? 'tg-dark' : 'tg-light';
 
         let header = null;
-        let messages = [];
+        let messages = [];       // final message objects
+        let msgsByNum = {};      // {num → msg} for reply lookup
+        let autoNum = 0;         // auto-incrementing counter
+        let lastSender = null;   // for sender continuation
+        let baseTime = null;     // current time block
+        let senderChanges = 0;   // count sender changes since time block
 
         lines.forEach(line => {
-            let pure = line
-                .replace(/<[^>]*>/g, '')
-                .replace(/&gt;/g, '>')
-                .replace(/&lt;/g, '<')
-                .replace(/&amp;/g, '&')
-                .replace(/&quot;/g, '"')
-                .replace(/&#39;/g, "'")
-                .replace(/&nbsp;/g, ' ')
-                .trim();
+            let pure = decodeEntities(line.replace(/<[^>]*>/g, '')).trim();
             if (!pure) return;
 
-            // ── Header: "= ChatName | status" ──
+            // ── 1. Header: "= Name | status" ──
             const hm = pure.match(/^=\s*(.+?)(?:\s*\|\s*(.+))?$/);
             if (hm) {
                 header = { name: hm[1].trim(), status: (hm[2] || '').trim() };
                 return;
             }
 
-            // ── Message line ──
-            // Name captured as anything before the first 'HH:MM' (robust for any unicode)
-            // Format: Sender 'HH:MM' (type: data) ! : text >> reactions
-            const mm = pure.match(
-                /^([^']+?)\s+'(\d{2}:\d{2})'\s*(?:\((reply|file|voice|photo|video|sticker|media|contact|location)(?::\s*(.*?))?\))?\s*(!)?\s*:\s*([\s\S]*)$/i
-            );
-            if (mm) {
-                let msgText = mm[6].trim();
-                let reactions = [];
+            // ── 2. Time block: "'HH:MM'" ──
+            const tm = pure.match(/^'(\d{2}:\d{2})'$/);
+            if (tm) {
+                baseTime = tm[1];
+                senderChanges = 0;
+                return;
+            }
 
-                // ── Extract reactions from end of text: "text >> 😍2 🔥" ──
-                const reactSplit = msgText.lastIndexOf('>>');
-                if (reactSplit !== -1) {
-                    const reactStr = msgText.substring(reactSplit + 2).trim();
-                    if (reactStr) {
-                        reactions = parseReactions(reactStr);
-                        if (reactions.length > 0) {
-                            msgText = msgText.substring(0, reactSplit).trim();
-                        }
-                    }
+            // ── 3. Reactions line: ">> emoji" ──
+            const rm = pure.match(/^>>\s*(.+)$/);
+            if (rm && messages.length > 0) {
+                const reactions = parseReactions(rm[1]);
+                if (reactions.length) {
+                    messages[messages.length - 1].reactions = reactions;
                 }
+                return;
+            }
 
-                messages.push({
-                    sender: mm[1].trim(),
-                    time: mm[2],
-                    type: mm[3] ? mm[3].toLowerCase() : null,
-                    data: mm[4] || null,
-                    reactions: reactions,
-                    err: !!mm[5],
-                    text: msgText,
-                });
-            } else {
-                // System message (date separators, join notifications, etc.)
+            // ── 4. Try to parse as message ──
+
+            // Strip optional {N} prefix
+            let explicitNum = null;
+            let rest = pure;
+            const numM = rest.match(/^\{(\d+)\}\s*/);
+            if (numM) {
+                explicitNum = parseInt(numM[1]);
+                rest = rest.slice(numM[0].length);
+            }
+
+            // Find separator colon (not inside parens)
+            const colonIdx = findSepColon(rest);
+            if (colonIdx === -1) {
+                // No colon → system message
                 messages.push({ system: pure });
+                return;
+            }
+
+            let prefix = rest.slice(0, colonIdx).trim();
+            let msgText = rest.slice(colonIdx + 1).trim();
+
+            // ── Extract inline reactions from text: "text >> emoji" (backward compat) ──
+            let reactions = [];
+            const rrIdx = msgText.lastIndexOf('>>');
+            if (rrIdx !== -1) {
+                const rStr = msgText.substring(rrIdx + 2).trim();
+                if (rStr) {
+                    const parsed = parseReactions(rStr);
+                    if (parsed.length) { reactions = parsed; msgText = msgText.substring(0, rrIdx).trim(); }
+                }
+            }
+
+            // ── Parse prefix right-to-left: [Sender] ['HH:MM'] [(type)] [!] ──
+            let err = false;
+            if (prefix.endsWith('!')) { err = true; prefix = prefix.slice(0, -1).trim(); }
+
+            // Extract (type) from end
+            let typeInfo = { type: null, data: null };
+            const typeM = prefix.match(/\(([^)]*)\)\s*$/);
+            if (typeM) {
+                typeInfo = parseTypeStr(typeM[1]);
+                prefix = prefix.slice(0, typeM.index).trim();
+            }
+
+            // Extract 'HH:MM' from end
+            let explicitTime = null;
+            const timeM = prefix.match(/'(\d{2}:\d{2})'\s*$/);
+            if (timeM) {
+                explicitTime = timeM[1];
+                prefix = prefix.slice(0, timeM.index).trim();
+            }
+
+            // What remains is the sender name (or empty for continuation)
+            let sender = prefix || null;
+
+            // Sender continuation logic
+            if (sender) {
+                if (sender !== lastSender) {
+                    senderChanges++;
+                    lastSender = sender;
+                }
+            } else {
+                sender = lastSender || 'Unknown';
+            }
+
+            // Time logic: explicit > auto-increment from base
+            let time;
+            if (explicitTime) {
+                time = explicitTime;
+                // Also update base time when explicitly set on a message
+                baseTime = explicitTime;
+                senderChanges = 0;
+            } else if (baseTime) {
+                time = addMinutes(baseTime, senderChanges > 0 ? senderChanges - 1 : 0);
+            } else {
+                time = ''; // no time at all
+            }
+
+            // Auto-numbering
+            autoNum++;
+            const msgNum = explicitNum || autoNum;
+
+            const msg = {
+                num: msgNum,
+                sender: sender,
+                time: time,
+                type: typeInfo.type,
+                data: typeInfo.data,
+                reactions: reactions,
+                err: err,
+                text: msgText,
+            };
+
+            messages.push(msg);
+            msgsByNum[msgNum] = msg;
+
+            // If explicit num was provided, sync autoNum
+            if (explicitNum && explicitNum >= autoNum) {
+                autoNum = explicitNum;
             }
         });
 
-        // Auto-detect header from first non-Me sender if not specified
+        // ── Auto-detect header ──
         if (!header) {
             const firstSender = messages.find(m => m.sender && m.sender.toLowerCase() !== 'me');
-            header = {
-                name: firstSender ? firstSender.sender : 'Chat',
-                status: '',
-            };
+            header = { name: firstSender ? firstSender.sender : 'Chat', status: '' };
         }
 
+        // ══════════════════════
+        // BUILD HTML
+        // ══════════════════════
         const hIdx = getColorIndex(header.name);
-
-        // ════════════════════════════════════
-        // BUILD HTML (no inline styles, no SVG tails)
-        // ════════════════════════════════════
         let html = `<div class="tg-container ${themeClass}">`;
 
         // Header
@@ -233,13 +356,17 @@ function parseTelegramTags(htmlText) {
             const cIdx = getColorIndex(msg.sender);
             const isSticker = msg.type === 'sticker';
 
-            // ── Sticker (no bubble) ──
+            // ── Meta HTML ──
+            let metaHtml = `<span class="tg-meta">`;
+            if (msg.time) metaHtml += `<span class="tg-time">${msg.time}</span>`;
+            if (isMe && !msg.err) metaHtml += `<span class="tg-checks tg-read">${SVG.check2}</span>`;
+            metaHtml += `</span>`;
+
+            // ── Sticker ──
             if (isSticker) {
                 html += `<div class="tg-msg-row ${dir} tg-sticker-row ${hasTail ? 'tg-has-tail' : ''}">`;
                 html += `<div class="tg-sticker">${msg.data || msg.text || '😀'}</div>`;
-                html += `<div class="tg-meta"><span class="tg-time">${msg.time}</span>`;
-                if (isMe && !msg.err) html += `<span class="tg-checks tg-read">${SVG.check2}</span>`;
-                html += `</div>`;
+                html += `<div class="tg-meta-standalone">${metaHtml}</div>`;
                 if (msg.reactions.length) html += buildReactions(msg.reactions);
                 html += `</div>`;
                 return;
@@ -258,28 +385,33 @@ function parseTelegramTags(htmlText) {
             html += `<div class="tg-bubble">`;
 
             // Sender name
-            if (showName) {
-                html += `<div class="tg-sender tg-name-${cIdx + 1}">${msg.sender}</div>`;
-            }
+            if (showName) html += `<div class="tg-sender tg-name-${cIdx + 1}">${msg.sender}</div>`;
 
-            // ── Reply ──
+            // ── Reply (r#N or old format) ──
             if (msg.type === 'reply' && msg.data) {
-                // Format: "Author | quoted text"
-                const pipeIdx = msg.data.indexOf('|');
                 let replyAuthor, replyText;
-                if (pipeIdx !== -1) {
-                    replyAuthor = msg.data.substring(0, pipeIdx).trim();
-                    replyText = msg.data.substring(pipeIdx + 1).trim();
+                const refNum = parseInt(msg.data);
+                if (!isNaN(refNum) && msgsByNum[refNum]) {
+                    // Compact: r#N — look up message by number
+                    const ref = msgsByNum[refNum];
+                    replyAuthor = ref.sender;
+                    replyText = ref.text || (ref.type === 'voice' ? '🎤 Voice message' : ref.type === 'photo' ? '📷 Photo' : '...');
                 } else {
-                    // Fallback: entire data is the quoted text, author unknown
-                    replyAuthor = '...';
-                    replyText = msg.data;
+                    // Old format: "Author | text"
+                    const pipeIdx = msg.data.indexOf('|');
+                    if (pipeIdx !== -1) {
+                        replyAuthor = msg.data.substring(0, pipeIdx).trim();
+                        replyText = msg.data.substring(pipeIdx + 1).trim();
+                    } else {
+                        replyAuthor = '...';
+                        replyText = msg.data;
+                    }
                 }
-                const replyColorIdx = getColorIndex(replyAuthor);
+                const rColorIdx = getColorIndex(replyAuthor);
                 html += `<div class="tg-reply">`;
-                html += `<div class="tg-reply-bar" style="background:${NAME_COLORS[replyColorIdx]}"></div>`;
+                html += `<div class="tg-reply-bar" style="background:${NAME_COLORS[rColorIdx]}"></div>`;
                 html += `<div class="tg-reply-content">`;
-                html += `<div class="tg-reply-name tg-name-${replyColorIdx + 1}">${replyAuthor}</div>`;
+                html += `<div class="tg-reply-name tg-name-${rColorIdx + 1}">${replyAuthor}</div>`;
                 html += `<div class="tg-reply-text">${replyText}</div>`;
                 html += `</div></div>`;
             }
@@ -292,15 +424,10 @@ function parseTelegramTags(htmlText) {
                 html += `<div class="tg-voice-play">${SVG.play}</div>`;
                 html += `<div class="tg-voice-body">`;
                 html += `<div class="tg-waveform">`;
-                waveform.forEach(h => {
-                    html += `<div class="tg-waveform-bar" style="height:${h}px"></div>`;
-                });
-                html += `</div>`;
-                html += `<div class="tg-voice-dur">${dur}</div>`;
+                waveform.forEach(h => { html += `<div class="tg-waveform-bar" style="height:${h}px"></div>`; });
+                html += `</div><div class="tg-voice-dur">${dur}</div>`;
                 html += `</div></div>`;
-                if (msg.data) {
-                    html += `<div class="tg-voice-transcript">${msg.data}</div>`;
-                }
+                if (msg.data) html += `<div class="tg-voice-transcript">${msg.data}</div>`;
             }
 
             // ── Photo / Media ──
@@ -309,19 +436,14 @@ function parseTelegramTags(htmlText) {
             }
 
             // ── Video ──
-            if (msg.type === 'video') {
-                html += `<div class="tg-media-placeholder">${SVG.video}</div>`;
-            }
+            if (msg.type === 'video') html += `<div class="tg-media-placeholder">${SVG.video}</div>`;
 
             // ── File ──
             if (msg.type === 'file') {
                 const fname = msg.data || 'document.pdf';
-                html += `<div class="tg-file">`;
-                html += `<div class="tg-file-icon">${SVG.file}</div>`;
-                html += `<div class="tg-file-info">`;
-                html += `<div class="tg-file-name">${fname}</div>`;
-                html += `<div class="tg-file-size">${getRandomSize(fname)}</div>`;
-                html += `</div></div>`;
+                html += `<div class="tg-file"><div class="tg-file-icon">${SVG.file}</div>`;
+                html += `<div class="tg-file-info"><div class="tg-file-name">${fname}</div>`;
+                html += `<div class="tg-file-size">${getRandomSize(fname)}</div></div></div>`;
             }
 
             // ── Contact ──
@@ -330,46 +452,33 @@ function parseTelegramTags(htmlText) {
                 const ccIdx = getColorIndex(cname);
                 html += `<div class="tg-contact">`;
                 html += `<div class="tg-contact-avatar tg-avatar-${ccIdx + 1}">${getInitials(cname)}</div>`;
-                html += `<div class="tg-contact-name">${cname}</div>`;
-                html += `</div>`;
+                html += `<div class="tg-contact-name">${cname}</div></div>`;
             }
 
-            // ── Build meta HTML ──
-            let metaHtml = `<span class="tg-meta">`;
-            metaHtml += `<span class="tg-time">${msg.time}</span>`;
-            if (isMe && !msg.err) {
-                metaHtml += `<span class="tg-checks tg-read">${SVG.check2}</span>`;
-            }
-            metaHtml += `</span>`;
-
-            // ── Text + meta (meta goes INSIDE text for proper float interaction) ──
+            // ── Text + meta ──
             if (msg.text) {
                 html += `<div class="tg-text">${msg.text}<span class="tg-spacer"></span>${metaHtml}</div>`;
             } else {
-                // No text — meta floats inside the bubble after attachment
                 html += `<div class="tg-meta-standalone">${metaHtml}</div>`;
             }
 
             html += `</div>`; // .tg-bubble
 
-            // ── Error badge (below bubble, won't break alignment) ──
+            // Error badge
             if (msg.err) {
                 html += `<div class="tg-error-badge">`;
                 html += `<div class="tg-error-icon">${SVG.error}</div>`;
-                html += `<span class="tg-error-label">Sending failed</span>`;
-                html += `</div>`;
+                html += `<span class="tg-error-label">Sending failed</span></div>`;
             }
 
-            // ── Reactions ──
-            if (msg.reactions.length) {
-                html += buildReactions(msg.reactions);
-            }
+            // Reactions
+            if (msg.reactions.length) html += buildReactions(msg.reactions);
 
             html += `</div>`; // .tg-msg-row
         });
         html += `</div>`; // .tg-messages
 
-        // Input bar (decorative)
+        // Input bar
         html += `<div class="tg-input-bar">`;
         html += `<div class="tg-input-btn">${SVG.sticker}</div>`;
         html += `<div class="tg-input-field">Message</div>`;
@@ -377,7 +486,7 @@ function parseTelegramTags(htmlText) {
         html += `<div class="tg-input-send">${SVG.send}</div>`;
         html += `</div>`;
 
-        html += `</div>`; // .tg-container
+        html += `</div>`;
         return html;
     });
 }
@@ -385,15 +494,11 @@ function parseTelegramTags(htmlText) {
 function buildReactions(reactions) {
     let html = '<div class="tg-reactions">';
     reactions.forEach(r => {
-        html += `<div class="tg-reaction">`;
-        html += `<span class="tg-reaction-emoji">${r.emoji}</span>`;
-        if (r.count > 1) {
-            html += `<span class="tg-reaction-count">${r.count}</span>`;
-        }
+        html += `<div class="tg-reaction"><span class="tg-reaction-emoji">${r.emoji}</span>`;
+        if (r.count > 1) html += `<span class="tg-reaction-count">${r.count}</span>`;
         html += `</div>`;
     });
-    html += '</div>';
-    return html;
+    return html + '</div>';
 }
 
 // ── Render logic ──
@@ -407,10 +512,7 @@ function render() {
         const h = $el.html();
         if (!h || !h.toLowerCase().includes('telegram')) return;
         const n = parseTelegramTags(h);
-        if (h !== n) {
-            $el.html(n);
-            $el.attr(PARSED_ATTR, '1');
-        }
+        if (h !== n) { $el.html(n); $el.attr(PARSED_ATTR, '1'); }
     });
 }
 
@@ -425,7 +527,6 @@ function resetParsed() {
     scheduleRender();
 }
 
-// ── Init ──
 jQuery(async () => {
     eventSource.on(event_types.CHAT_CHANGED, resetParsed);
     eventSource.on(event_types.MESSAGE_RECEIVED, scheduleRender);
@@ -436,5 +537,5 @@ jQuery(async () => {
         scheduleRender();
     });
     setTimeout(render, 600);
-    console.log(`[${EXT_NAME}] Loaded.`);
+    console.log(`[${EXT_NAME}] v3 loaded.`);
 });
