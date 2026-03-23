@@ -568,24 +568,33 @@ function buildReactions(reactions) {
 }
 
 // ── Render logic ──
-let renderScheduled = false;
-
 function render() {
-    renderScheduled = false;
     $('.mes_text').each(function () {
         const $el = $(this);
+        let h = $el.html();
+        if (!h) return;
+
+        // Replace ㅤ (Hangul filler) ALWAYS, even in already-parsed messages
+        if (h.includes('ㅤ')) {
+            h = h.replace(/ㅤ/g, ' ');
+            $el.html(h);
+            $el.removeAttr(PARSED_ATTR); // force re-parse after cleanup
+        }
+
         if ($el.attr(PARSED_ATTR)) return;
-        const h = $el.html();
-        if (!h || !h.toLowerCase().includes('telegram')) return;
+        if (!h.toLowerCase().includes('telegram')) return;
         const n = parseTelegramTags(h);
         if (h !== n) { $el.html(n); $el.attr(PARSED_ATTR, '1'); }
     });
 }
 
+// Schedule render with multiple retries (streaming may not be done on first try)
+let renderTimer = null;
 function scheduleRender() {
-    if (renderScheduled) return;
-    renderScheduled = true;
-    requestAnimationFrame(() => setTimeout(render, 100));
+    if (renderTimer) clearTimeout(renderTimer);
+    // First try fast, second try after streaming likely done
+    setTimeout(render, 100);
+    renderTimer = setTimeout(render, 500);
 }
 
 function resetParsed() {
@@ -599,10 +608,10 @@ jQuery(async () => {
     eventSource.on(event_types.MESSAGE_RECEIVED, scheduleRender);
     eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, scheduleRender);
     eventSource.on(event_types.USER_MESSAGE_RENDERED, scheduleRender);
-    eventSource.on(event_types.MESSAGE_UPDATED, () => {
-        $(`.mes_text[${PARSED_ATTR}]`).removeAttr(PARSED_ATTR);
-        scheduleRender();
-    });
-    setTimeout(render, 600);
+    eventSource.on(event_types.MESSAGE_UPDATED, resetParsed);
+    // Initial render with retries
+    setTimeout(render, 300);
+    setTimeout(render, 800);
+    setTimeout(render, 1500);
     console.log(`[${EXT_NAME}] v3 loaded.`);
 });
