@@ -9,5 +9,5 @@
     "version": "1.0.0",
     "description": "Парсит теги {telegram}...{/telegram} и превращает их в точную копию интерфейса Telegram с автоопределением темы, голосовыми, реплаями и реакциями.",
     "homePage": "",
-    "auto_update": false
+    "auto_update": true
 }
