@@ -289,8 +289,8 @@
 .tg-out .tg-time { color: var(--tg-time-out); }
 
 .tg-checks { display: inline-flex; align-items: center; }
-.tg-checks svg { width: 16px; height: 16px; }
-.tg-checks.tg-read svg { fill: var(--tg-check-read); }
+.tg-checks svg { height: 12px; width: auto; }
+.tg-checks.tg-read { color: var(--tg-check-read); }
 
 /* --- Error state (inline, doesn't break row alignment) --- */
 .tg-msg-error .tg-bubble { opacity: 0.65; }
@@ -392,7 +392,7 @@
 
 /* --- File card --- */
 .tg-file { display: flex; align-items: center; gap: 10px; padding: 4px 2px; min-width: 200px; }
-.tg-file-icon { width: 42px; height: 42px; border-radius: 10px; background: var(--tg-file-icon-bg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.tg-file-icon { width: 42px; height: 42px; border-radius: 50%; background: var(--tg-file-icon-bg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .tg-file-icon svg { width: 22px; height: 22px; fill: #ffffff; }
 .tg-file-info { display: flex; flex-direction: column; min-width: 0; }
 .tg-file-name { font-size: 14px; font-weight: 500; color: var(--tg-accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
@@ -492,4 +492,4 @@
     .tg-voice { min-width: 180px; }
     .tg-sticker { font-size: 80px; }
     .tg-header-btn, .tg-input-btn, .tg-input-send { min-width: 44px; min-height: 44px; }
-}
+   }
