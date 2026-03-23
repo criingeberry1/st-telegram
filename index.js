@@ -51,13 +51,12 @@ async function loadStickerCatalog() {
 }
 
 // Resolve "(s: memes😂)" or "(s: 😂)" → image URL or null
-function resolveSticker(data) {
+// msgSeed = stable identifier for deterministic pick (e.g. message number)
+function resolveSticker(data, msgSeed) {
     if (!data || !stickerCatalog) return null;
     const raw = data.trim();
 
     // Split into optional pack name + emoji
-    // "memes😂" → pack="memes", emoji="😂"
-    // "😂" → pack=null, emoji="😂"
     const emojiRegex = /(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)/u;
     const emojiMatch = raw.match(emojiRegex);
     if (!emojiMatch) return null;
@@ -70,13 +69,11 @@ function resolveSticker(data) {
     let candidates = [];
 
     if (packName && stickerCatalog.map[packName]) {
-        // Specific pack
         const packMap = stickerCatalog.map[packName];
         if (packMap[emoji]) {
             candidates = packMap[emoji].map(id => `stickers/${id}.${ext}`);
         }
     } else {
-        // Search all packs
         for (const [, packMap] of Object.entries(stickerCatalog.map)) {
             if (packMap[emoji]) {
                 candidates.push(...packMap[emoji].map(id => `stickers/${id}.${ext}`));
@@ -85,7 +82,8 @@ function resolveSticker(data) {
     }
 
     if (candidates.length === 0) return null;
-    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    // Deterministic pick: hash the seed to always get the same sticker
+    const pick = candidates[hashStr(String(msgSeed) + emoji) % candidates.length];
     return EXT_BASE + pick;
 }
 
@@ -427,7 +425,7 @@ function parseTelegramTags(htmlText) {
             // ── Sticker ──
             if (isSticker) {
                 const stickerData = msg.data || msg.text || '😀';
-                const stickerUrl = resolveSticker(stickerData);
+                const stickerUrl = resolveSticker(stickerData, msg.num);
                 html += `<div class="tg-msg-row ${dir} tg-sticker-row ${hasTail ? 'tg-has-tail' : ''}">`;
                 if (stickerUrl) {
                     html += `<div class="tg-sticker tg-sticker-img"><img src="${stickerUrl}" alt="sticker" loading="lazy"></div>`;
