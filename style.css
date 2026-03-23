@@ -370,6 +370,13 @@
 
 /* --- Sticker --- */
 .tg-sticker { font-size: 96px; line-height: 1; padding: 4px; }
+.tg-sticker-img { font-size: inherit; }
+.tg-sticker-img img {
+    width: 160px;
+    height: 160px;
+    object-fit: contain;
+    display: block;
+}
 .tg-sticker-row .tg-meta { float: none; margin: 0; padding: 0 4px; display: flex; }
 .tg-out.tg-sticker-row .tg-meta { justify-content: flex-end; }
 .tg-sticker-row .tg-time { color: var(--tg-text-secondary); }
@@ -491,5 +498,6 @@
     .tg-messages { padding: 4px 6px 6px 6px; }
     .tg-voice { min-width: 180px; }
     .tg-sticker { font-size: 80px; }
+    .tg-sticker-img img { width: 130px; height: 130px; }
     .tg-header-btn, .tg-input-btn, .tg-input-send { min-width: 44px; min-height: 44px; }
 }
