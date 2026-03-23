@@ -15,7 +15,8 @@
 //   Sender (f: file.pdf): caption    ← file
 //   Sender (p): caption              ← photo
 //   Sender (vid): caption            ← video
-//   Sender (s: 😎):                  ← sticker
+//   Sender (s: pack😂):              ← custom sticker (pack + emoji)
+//   Sender (s: 😂):                  ← sticker from any pack
 //   Sender (c: Name):                ← contact
 //   Sender !: failed message         ← send error
 //   ~ 😍2 🔥                        ← reactions (attaches to previous message)
@@ -30,6 +31,63 @@ import { eventSource, event_types } from '../../../../script.js';
 
 const EXT_NAME = 'telegram-ui';
 const PARSED_ATTR = 'data-tg-parsed';
+
+// ── Extension base URL (for loading stickers) ──
+const EXT_BASE = new URL('.', import.meta.url).href;
+
+// ── Sticker catalog (loaded async on init) ──
+let stickerCatalog = null;
+
+async function loadStickerCatalog() {
+    try {
+        const res = await fetch(EXT_BASE + 'stickers/catalog.json');
+        if (res.ok) {
+            stickerCatalog = await res.json();
+            console.log(`[${EXT_NAME}] Sticker catalog loaded: ${Object.keys(stickerCatalog.map).length} packs`);
+        }
+    } catch (e) {
+        console.warn(`[${EXT_NAME}] No sticker catalog found, using emoji fallback.`);
+    }
+}
+
+// Resolve "(s: memes😂)" or "(s: 😂)" → image URL or null
+function resolveSticker(data) {
+    if (!data || !stickerCatalog) return null;
+    const raw = data.trim();
+
+    // Split into optional pack name + emoji
+    // "memes😂" → pack="memes", emoji="😂"
+    // "😂" → pack=null, emoji="😂"
+    const emojiRegex = /(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)/u;
+    const emojiMatch = raw.match(emojiRegex);
+    if (!emojiMatch) return null;
+
+    const emojiIdx = raw.indexOf(emojiMatch[0]);
+    const packName = emojiIdx > 0 ? raw.slice(0, emojiIdx).trim() : null;
+    const emoji = emojiMatch[0];
+    const ext = stickerCatalog.ext || 'webp';
+
+    let candidates = [];
+
+    if (packName && stickerCatalog.map[packName]) {
+        // Specific pack
+        const packMap = stickerCatalog.map[packName];
+        if (packMap[emoji]) {
+            candidates = packMap[emoji].map(id => `stickers/${id}.${ext}`);
+        }
+    } else {
+        // Search all packs
+        for (const [, packMap] of Object.entries(stickerCatalog.map)) {
+            if (packMap[emoji]) {
+                candidates.push(...packMap[emoji].map(id => `stickers/${id}.${ext}`));
+            }
+        }
+    }
+
+    if (candidates.length === 0) return null;
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    return EXT_BASE + pick;
+}
 
 // ── SVG icons ──
 const SVG = {
@@ -368,8 +426,14 @@ function parseTelegramTags(htmlText) {
 
             // ── Sticker ──
             if (isSticker) {
+                const stickerData = msg.data || msg.text || '😀';
+                const stickerUrl = resolveSticker(stickerData);
                 html += `<div class="tg-msg-row ${dir} tg-sticker-row ${hasTail ? 'tg-has-tail' : ''}">`;
-                html += `<div class="tg-sticker">${msg.data || msg.text || '😀'}</div>`;
+                if (stickerUrl) {
+                    html += `<div class="tg-sticker tg-sticker-img"><img src="${stickerUrl}" alt="sticker" loading="lazy"></div>`;
+                } else {
+                    html += `<div class="tg-sticker">${stickerData}</div>`;
+                }
                 html += `<div class="tg-meta-standalone">${metaHtml}</div>`;
                 if (msg.reactions.length) html += buildReactions(msg.reactions);
                 html += `</div>`;
@@ -532,6 +596,7 @@ function resetParsed() {
 }
 
 jQuery(async () => {
+    await loadStickerCatalog();
     eventSource.on(event_types.CHAT_CHANGED, resetParsed);
     eventSource.on(event_types.MESSAGE_RECEIVED, scheduleRender);
     eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, scheduleRender);
