@@ -267,7 +267,7 @@
     align-items: flex-end;
     gap: 2px;
     float: right;
-    margin: 4px 0 -4px 4px;
+    margin: 6px 0 -6px 4px;
     white-space: nowrap;
     position: relative;
 }
